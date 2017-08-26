@@ -1,0 +1,307 @@
+/*
+ * main.c
+ *
+ *  Created on: 05.11.2016
+ *      Author: dawid
+ */
+/*
+ * main.c
+ *
+ *  Created on: 05.11.2016
+ *      Author: dawid
+ */
+#include <avr/io.h>
+#include <util/delay.h>
+#include  "uart.h"
+#include <avr/interrupt.h>
+#include <util/delay.h>
+
+
+#define L_FOV PD5
+#define L_BACK PD6
+#define R_FOV PD7
+#define R_BACK PB0
+
+#define L_FOV_PORT PORTD
+#define L_BACK_PORT PORTD
+#define R_FOV_PORT PORTD
+#define R_BACK_PORT PORTB
+
+#define L_FOV_DIR DDRD
+#define L_BACK_DIR DDRD
+#define R_FOV_DIR DDRD
+#define R_BACK_DIR DDRB
+
+#define SET_L_FOV L_FOV_DIR |= (1<<L_FOV)
+#define SET_L_BACK L_BACK_DIR |= (1<<L_BACK)
+#define SET_R_FOV R_FOV_DIR |= (1<<R_FOV)
+#define SET_R_BACK R_BACK_DIR |= (1<<R_BACK)
+
+#define L_FOV_ON L_FOV_PORT |= (1<<L_FOV)
+#define L_BACK_ON L_BACK_PORT |= (1<<L_BACK)
+#define R_FOV_ON R_FOV_PORT |= (1<<R_FOV)
+#define R_BACK_ON R_BACK_PORT |= (1<<R_BACK)
+
+#define L_FOV_OFF L_FOV_PORT &=~ (1<<L_FOV)
+#define L_BACK_OFF L_BACK_PORT  &=~ (1<<L_BACK)
+#define R_FOV_OFF R_FOV_PORT  &=~ (1<<R_FOV)
+#define R_BACK_OFF R_BACK_PORT  &=~ (1<<R_BACK)
+
+#define LED_PORT PORTC
+#define LED_PIN PC3
+#define LED_ON LED_PORT |= (1<<LED_PIN)
+#define LED_OFF LED_PORT  &=~ (1<<LED_PIN)
+
+#define MAX_SIGNAL_VALUE 40
+#define MIN_SIGNAL_VALUE 0
+
+#define TRIGGER_L_SIGNAL 'q'
+#define TRIGGER_R_SIGNAL 'e'
+
+#define L_BUMPER_PRESSED_SIGNAL 'k'
+#define L_BUMPER_FREE_SIGNAL 'l'
+
+#define R_BUMPER_PRESSED_SIGNAL 'm'
+#define R_BUMPER_FREE_SIGNAL 'n'
+
+#define FOWARD_SIGNAL 'w'
+#define BACK_SIGNAL 's'
+#define LEFT_SIGNAL 'a'
+#define RIGHT_SIGNAL 'd'
+
+#define STOP_SIGNAL 27 //esc ASCII signal
+volatile unsigned char flag_reg;
+
+#define L_DIR_BIT 0
+#define R_DIR_BIT 1
+#define STOP_BIT 2
+
+
+#define L_DIR_FLAG flag_reg & (1<<L_DIR_BIT)
+#define R_DIR_FLAG flag_reg & (1<<R_DIR_BIT)
+#define STOP_FLAG flag_reg & (1<<STOP_BIT)
+
+#define SET_L_DIR_ON flag_reg |= (1<<L_DIR_BIT)
+#define SET_R_DIR_ON flag_reg |= (1<<R_DIR_BIT)
+#define SET_STOP_ON flag_reg |= (1<<STOP_BIT)
+
+#define SET_L_DIR_OFF flag_reg &=~ (1<<L_DIR_BIT)
+#define SET_R_DIR_OFF flag_reg &=~ (1<<R_DIR_BIT)
+#define SET_STOP_OFF flag_reg &=~ (1<STOP_BIT)
+
+#define TOGGLE_STOP flag_reg ^= (1<<STOP_BIT)
+
+
+unsigned char received_data;
+unsigned char is_next_value;
+unsigned char command;
+unsigned char command_value;
+
+volatile unsigned char signal_value;
+volatile unsigned char timer_counter;
+volatile unsigned char l_motor_pwm;
+volatile unsigned char r_motor_pwm;
+
+unsigned char is_in_range(unsigned char data);
+void execute_command(unsigned char comm, unsigned char val);
+
+int main(){
+
+
+	//TIMER SETUP
+	//8BIT TIMER0 USED
+	TIMSK0 |= (1<<TOIE0);
+	timer_counter = 0;
+	TCCR0B |= (1<<CS00) | (1<<CS01); //start timer, prescaller 64
+
+	sei();
+
+	//OUTPUTS SETUP
+	SET_L_FOV;
+	SET_L_BACK;
+	SET_R_FOV;
+	SET_R_BACK;
+	SET_STOP_OFF;
+	DDRC |= (1>>LED_PIN);
+	//UART SETUP
+	uart_init();
+
+
+	while(1){
+
+		received_data = uart_receive();
+
+		if(is_next_value && is_in_range(received_data - 'A')){
+				execute_command(command, received_data - 'A');
+			}
+		else
+			{
+				switch(received_data){
+					case FOWARD_SIGNAL:
+					case BACK_SIGNAL:
+					case LEFT_SIGNAL:
+					case RIGHT_SIGNAL:
+					case TRIGGER_L_SIGNAL:
+					case TRIGGER_R_SIGNAL:
+
+						command = received_data;
+						is_next_value = 1;
+						break;
+					//will be more
+					case L_BUMPER_PRESSED_SIGNAL:
+					case L_BUMPER_FREE_SIGNAL:
+					case R_BUMPER_PRESSED_SIGNAL:
+					case R_BUMPER_FREE_SIGNAL:
+					case STOP_SIGNAL:
+						execute_command(received_data, 0);
+						break;
+					default:
+						is_next_value = 0;
+						break;
+				}
+			}
+		}//end of main loop*/
+	return 0;
+	}
+
+
+
+
+
+
+unsigned char is_in_range(unsigned char data)
+{
+	if(data > MAX_SIGNAL_VALUE || data < MIN_SIGNAL_VALUE)
+		return 0;
+	else return 1;
+}
+////////////////////////////////////////////////////////////////////////////
+
+	ISR(TIMER0_OVF_vect) {
+
+
+		TCNT0 = 254;
+
+
+		if(L_DIR_FLAG){
+			if(timer_counter == MIN_SIGNAL_VALUE){
+				L_BACK_OFF;
+				L_FOV_ON;
+			}
+
+			if(timer_counter == l_motor_pwm){
+				L_FOV_OFF;
+			}
+
+		}
+		else{
+			if(timer_counter == MIN_SIGNAL_VALUE){
+				L_FOV_OFF;
+				L_BACK_ON;
+
+			}
+
+			if(timer_counter == l_motor_pwm)
+				L_BACK_OFF;
+		}
+
+		if(R_DIR_FLAG){
+			if(timer_counter == MIN_SIGNAL_VALUE){
+				R_BACK_OFF;
+				R_FOV_ON;
+			}
+
+			if(timer_counter == r_motor_pwm)
+				R_FOV_OFF;
+		}
+		else{
+			if(timer_counter == MIN_SIGNAL_VALUE){
+				R_FOV_OFF;
+				R_BACK_ON;
+			}
+
+			if(timer_counter == r_motor_pwm)
+				R_BACK_OFF;
+		}
+
+
+
+		timer_counter++;
+		if(timer_counter > MAX_SIGNAL_VALUE)
+			timer_counter = MIN_SIGNAL_VALUE;
+	}
+////////////////////////////////////////////////////////////////////////////////
+void execute_command(unsigned char comm, unsigned char val){
+
+	//no_command_incoming = 0;
+
+	if(comm == STOP_SIGNAL)
+		TOGGLE_STOP;
+
+	if(STOP_FLAG){
+		LED_ON;
+		l_motor_pwm = 0;
+		r_motor_pwm = 0;
+		SET_L_DIR_ON;
+		SET_R_DIR_ON;
+		return;
+	}
+	else{
+		LED_OFF;
+	}
+
+	if(val > MIN_SIGNAL_VALUE)
+		val = val + MAX_SIGNAL_VALUE/2;
+
+
+	switch(comm){
+		case FOWARD_SIGNAL:
+			SET_L_DIR_ON;
+			SET_R_DIR_ON;
+			l_motor_pwm = val;
+			r_motor_pwm = val;
+			break;
+
+		case BACK_SIGNAL:
+			SET_L_DIR_OFF;
+			SET_R_DIR_OFF;
+			l_motor_pwm = val;
+			r_motor_pwm = val;
+			break;
+
+		case LEFT_SIGNAL:
+			r_motor_pwm += val;
+			break;
+		case RIGHT_SIGNAL:
+			l_motor_pwm += val;
+			break;
+
+		case TRIGGER_L_SIGNAL:
+			//SET_L_DIR_ON;
+			l_motor_pwm = val;
+			break;
+		case TRIGGER_R_SIGNAL:
+			//SET_R_DIR_ON;
+			r_motor_pwm = val;
+			break;
+
+		case L_BUMPER_PRESSED_SIGNAL:
+			SET_L_DIR_ON;
+			break;
+		case L_BUMPER_FREE_SIGNAL:
+			SET_L_DIR_OFF;
+			break;
+
+		case R_BUMPER_PRESSED_SIGNAL:
+			SET_R_DIR_ON;
+			break;
+		case R_BUMPER_FREE_SIGNAL:
+			SET_R_DIR_OFF;
+			break;
+
+		default:
+			break;
+	}
+///////////////////////////////////////////////////////////////////
+}
+
